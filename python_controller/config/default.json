@@ -1,0 +1,9 @@
+{
+  "camera": {"index": 0, "width": 640, "height": 480, "backend": "AUTO", "mirror": false},
+  "vision": {"model_path": "models/yolo11n.pt", "model_version": "YOLO11 nano COCO", "tracker": "bytetrack.yaml", "confidence": 0.35, "image_size": 480, "device": "cpu", "gesture_model_path": "models/gesture_recognizer.task", "max_hands": 4},
+  "follow": {"desired_height_ratio": 0.60, "height_deadband": 0.06, "horizontal_deadband": 0.10, "turn_gain": 0.6, "distance_gain": 15.0, "max_linear_cm_s": 5.0, "max_angular_rad_s": 0.5, "linear_accel_cm_s2": 5.0, "angular_accel_rad_s2": 0.8, "filter_alpha": 0.4, "size_min": 0.15, "size_max": 0.9, "size_jump_ratio": 0.5, "center_jump_ratio": 0.45, "overlap_iou": 0.1, "forward_sign": 1, "turn_sign": -1, "distance_step": 0.08},
+  "gesture": {"confidence": 0.75, "hold_s": 0.6, "min_frames": 3, "max_gap_s": 0.25, "release_s": 0.3, "mapping": {"Open_Palm": "RESUME", "Closed_Fist": "PAUSE", "Thumb_Up": "CLOSER", "Thumb_Down": "FARTHER"}},
+  "safety": {"perception_timeout_s": 0.25, "telemetry_timeout_s": 0.7, "person_confidence": 0.35, "require_radar": false},
+  "communication": {"host": "", "command_port": 8888, "telemetry_port": 8889, "send_period_s": 0.05, "signs_verified": false, "wheel_radius_cm": 2.9},
+  "motor_test": {"linear_cm_s": 2.5, "angular_rad_s": 0.2, "duration_s": 0.8, "max_duration_s": 2.0, "send_period_s": 0.1, "ui_lease_s": 0.25, "telemetry_timeout_s": 0.5, "stop_feedback_timeout_s": 2.0, "body_radius_cm": 9.0, "min_encoder_delta": 2, "min_wheel_speed_cm_s": 0.3}
+}

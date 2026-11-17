@@ -41,12 +41,6 @@ class DebugView:
         cv.rectangle(canvas,(width,0),(width+499,54),(30,30,185),-1)
         cv.putText(canvas,'EMERGENCY STOP [SPACE / E]',(width+12,34),cv.FONT_HERSHEY_SIMPLEX,.65,(255,255,255),2)
         cmd = decision.command
-        if mode == 'PI_GATEWAY':
-            transport_label = 'Pi UDP: TX ONLY / NO ACK (ESP32 not directly connected)'
-            radar_label = 'Rear radar: Pi enforces stop; no feedback to camera UI'
-        else:
-            transport_label = f'ESP32: {"CONNECTED" if snapshot["connected"] else "DISCONNECTED"}'
-            radar_label = 'Rear radar: UNKNOWN / NOT CONNECTED'
         lines = [f'Mode: {mode}',f'State: {decision.state}',f'People: {len(people)}  Candidate: {candidate}',
                  f'Target ID: {decision.target_id}',f'Armed: {armed}  Following: {decision.state in ("FOLLOWING","GESTURE_OVERRIDE")}',
                  f'Gesture: {gesture.name if gesture else ("DISABLED: MULTIPLE PEOPLE" if len(people)>1 else "NONE / UNASSOCIATED")}',
@@ -55,8 +49,8 @@ class DebugView:
                  f'Relative height: {decision.relative_size:.3f}' if decision.relative_size is not None else 'Relative height: --',
                  f'Desired height ratio: {desired:.2f} (uncalibrated)',
                  f'vx: {cmd.vx_cm_s:+.2f} cm/s  vy: {cmd.vy_cm_s:+.2f}',f'w: {cmd.w_rad_s:+.3f} rad/s',
-                 transport_label,
-                 f'Transport: {snapshot["reason"]}', radar_label,
+                 f'ESP32: {"CONNECTED" if snapshot["connected"] else "DISCONNECTED"}',
+                 f'Transport: {snapshot["reason"]}', 'Rear radar: UNKNOWN / NOT CONNECTED',
                  f'FPS: {fps:.1f}  Processing: {latency:.1f} ms',f'Stop / status: {decision.reason}',
                  'Click person -> ENTER confirms target','A: arm  R / Open Palm: resume','P / Closed Fist: pause  C: clear target',
                  'Thumb Up/Down: change relative setpoint','Q / ESC: stop and exit']
