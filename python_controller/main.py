@@ -29,7 +29,7 @@ def demo(config):
     return 0
 
 
-def run(config, hardware=False):
+def run(config, hardware=False, pi_gateway_host=None, pi_gateway_port=8890):
     import cv2
     from python_controller.vision.camera import Camera
     from python_controller.vision.person_detector import PersonDetector
@@ -37,7 +37,10 @@ def run(config, hardware=False):
     from python_controller.vision.gesture_recognizer import GestureRecognizer
     from python_controller.visualization.debug_view import DebugView
     from python_controller.communication.esp32_udp import UdpClient
-    c = Controller(config,hardware)
+    # In the initial camera-to-Pi test, block unverified reverse motion.
+    # The Pi gateway separately applies the rear radar stop interlock.
+    pi_mode = pi_gateway_host is not None
+    c = Controller(config, hardware or pi_mode)
     camera = gestures = view = client = None
     try:
         # Models load before connecting to the motor controller.
@@ -46,7 +49,14 @@ def run(config, hardware=False):
         camera = Camera(config['camera'])
         if hardware:
             client = UdpClient(config)
-            client.start()  # Repeated STOP only; no motion before A then R / Open Palm.
+            client.start()  # Existing manual motor-test path is unchanged.
+        elif pi_mode:
+            from python_controller.communication.pi_gateway_udp import PiGatewayClient
+            client = PiGatewayClient(pi_gateway_host, pi_gateway_port,
+                                     stale_s=config['safety']['perception_timeout_s'])
+            client.start()  # STOP until target confirmed + A + R/Open Palm.
+            print(f'[PI_GATEWAY] Sending requests to Raspberry Pi {pi_gateway_host}:{pi_gateway_port}')
+            print('[PI_GATEWAY] UDP send is not a delivery acknowledgement.')
         view = DebugView()
         last_display = time.monotonic()
         pending = None
@@ -89,7 +99,7 @@ def run(config, hardware=False):
             fps = 1/max(.000001,now-last_display)
             last_display = now
             canvas = view.draw(image,people,hands,decision,gesture,c.armed,c.follow.desired,
-                               snapshot,fps,(now-timestamp)*1000,candidate,'HARDWARE' if hardware else 'SIMULATION')
+                               snapshot,fps,(now-timestamp)*1000,candidate,'PI_GATEWAY' if pi_mode else ('HARDWARE' if hardware else 'SIMULATION'))
             view.show(canvas)
             key = cv2.waitKey(1)&0xff
             if key in (27,ord('q')) or view.closed():
@@ -117,12 +127,14 @@ def run(config, hardware=False):
 def main(argv=None):
     parser = argparse.ArgumentParser(description='Simulation-first person following and gesture control')
     parser.add_argument('--config',help='JSON overrides; defaults are always merged')
-    parser.add_argument('--mode',choices=('SIMULATION','HARDWARE'),default='SIMULATION')
+    parser.add_argument('--mode',choices=('SIMULATION','HARDWARE','PI_GATEWAY'),default='SIMULATION')
     parser.add_argument('--demo',action='store_true',help='Synthetic, headless, dependency-free control demo; never sends UDP')
     parser.add_argument('--ui',choices=('opencv','dashboard'),default='opencv',help='Dashboard is the default in run_simulation.bat; OpenCV retained for compatibility')
     parser.add_argument('--dashboard-preview',action='store_true',help='Clearly labeled synthetic dashboard; no hardware allowed')
     parser.add_argument('--smoke-seconds',type=float,help='Close dashboard after this many seconds (0.1 to 60)')
     parser.add_argument('--esp32-host',help='Numeric ESP32 IPv4 address; never the laptop IP')
+    parser.add_argument('--pi-host',help='Raspberry Pi IPv4; for camera-to-Pi mode only')
+    parser.add_argument('--pi-port',type=int,default=8890,help='Raspberry Pi camera command UDP port')
     parser.add_argument('--acknowledge-hardware-risk',action='store_true',help='Explicit hardware opt-in; physical sign verification also required')
     args = parser.parse_args(argv)
     if args.dashboard_preview and (args.mode=='HARDWARE' or args.ui!='dashboard'):
@@ -133,6 +145,17 @@ def main(argv=None):
         parser.error('HARDWARE requires --esp32-host and --acknowledge-hardware-risk; --demo cannot use HARDWARE')
     if args.mode=='HARDWARE' and args.ui!='dashboard':
         parser.error('Hardware is restricted to dashboard MOTOR TEST; automatic hardware following is disabled')
+    if args.mode=='PI_GATEWAY':
+        if args.demo or args.dashboard_preview or args.ui!='opencv':
+            parser.error('PI_GATEWAY requires OpenCV live camera; not dashboard/demo/preview')
+        if not args.acknowledge_hardware_risk or not args.pi_host:
+            parser.error('PI_GATEWAY requires --pi-host and --acknowledge-hardware-risk')
+        if args.esp32_host:
+            parser.error('PI_GATEWAY targets Raspberry Pi, not ESP32; omit --esp32-host')
+        if args.pi_port != 8890:
+            parser.error('Expected Raspberry Pi gateway camera port 8890')
+    elif args.pi_host:
+        parser.error('--pi-host can only be used with --mode PI_GATEWAY')
     try:
         config = load_config(args.config)
         if args.esp32_host: config['communication']['host'] = args.esp32_host
@@ -143,7 +166,8 @@ def main(argv=None):
         if args.ui=='dashboard':
             from python_controller.visualization.dashboard import run_dashboard
             return run_dashboard(config,args.mode=='HARDWARE',args.dashboard_preview,args.smoke_seconds)
-        return run(config,args.mode=='HARDWARE')
+        return run(config,args.mode=='HARDWARE',
+                   args.pi_host if args.mode=='PI_GATEWAY' else None, args.pi_port)
     except (ValueError,OSError,ImportError) as exc:
         print(f'STOP: {exc}')
         return 1
